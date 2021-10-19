@@ -4,7 +4,6 @@
         let removeBtn = $("#remove-btn");
         let inputField =  $("#input-text");
         let list = $("#dyn-list");
-        let inputArray = [];
         let counter = 0;
         addBtn.click(generateListElement);
         removeBtn.click(removeComplete);
@@ -12,14 +11,8 @@
         function generateListElement(){
             list.after(`<div class='input-group mx-auto mb-2 w-50 py-2 mb-2' id='list-item-${counter}'><input type='text' class='form-control' value='${inputField.val() }' id="list-input-${counter}" readonly><button class='input-group-text' id='list-btn-${counter}'>Claim</button></div>`);
             $(`#list-btn-${counter}`).click(claimTask);
-            let sortObject = {
-                id : `list-item-${counter}`,
-                value : inputField.value
-            }   
-            inputArray.push(sortObject);
             inputField.val("");
             counter++;
-            
         }
     
         function claimTask(event){
