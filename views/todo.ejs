@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+    <link rel="stylesheet" type="text/css" href="css/style.css">
+</head>
+<body>
+
+
+    <div class="p-3 text-center">
+        <h1>Task Manager</h1>
+    </div>
+
+    
+
+    <div class="card w-25 text-center m-auto shadow">
+        <p>
+            <a data-bs-toggle="collapse" href="#collapseExample" role="button" aria-expanded="false" aria-controls="collapseExample">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear-fill" viewBox="0 0 16 16">
+            <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"></path>
+            </svg>Logged in as <%= user.username %></a>
+        </p>
+        <div class="collapse" id="collapseExample">
+            <div class="card card-body">
+                <form action="/" method="post">
+                    <button type="submit" class="btn btn-primary">Logout</button>
+                </form> 
+            </div>
+          </div> 
+        </div>    
+
+    <div class="card m-auto shadow mt-5 flex w-50">
+        <div class="card-body" id="dyn-list">
+            <form action="/addTask" method="post">
+                <div class="input-group mx-auto mb-2 w-50 py-2">
+                    <input type="text" class="form-control" name="inputText" placeholder="Enter a new task here">
+                    <input type="text" class="d-none" name="user" value="<%= user.username%>" placeholder="Enter a new task here">
+                    <button class="input-group-text" type="submit" id="add-btn">Add</button>
+                </div>
+            </form>
+            <form action="/remove" method="post">
+                <button class="input-group-text mx-auto mt-3" id="remove-btn">Remove Complete</button>
+                <input type="text" class="d-none" name="user" value="<%= user%>" placeholder="Enter a new task here">
+            </form> 
+            <hr>
+        </div>
+        <%- include("partials/list-module.ejs", { taskList : taskList }) -%>
+    </div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="js/script.js"></script>
+
+</body>
+</html>

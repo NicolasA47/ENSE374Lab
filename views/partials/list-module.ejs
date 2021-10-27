@@ -1,0 +1,34 @@
+
+    <% for (let task of taskList) {%>
+        <% if (task.taskState === "unclaimed") { %>
+        <form action="/claim" method="post">
+            <div class='input-group mx-auto w-50 py-2 mb-2' id="list-item-<%=task._id%>" name="listItem" >
+                <input type='text' class='form-control' value='<%=task.taskText%>' readonly>
+                <button type="submit" class='input-group-text'>Claim</button>
+                <input type="text" class="d-none" name="taskId" value="<%=task._id%>" placeholder="Enter a new task here">
+                <input type="text" class="d-none" name="user" value="<%= user%>" placeholder="Enter a new task here">
+            </div>
+        </form>
+        <% } else if ((task.taskState === "claimed")){ %>
+            <form action="/abandon" method="post">
+                <div class='input-group-text px-0 py-0 mx-auto w-50 mb-2' id="list-item-<%=task._id%>" name="listItem" >
+                    <input onChange="this.form.submit()" class='form-check mx-2' type='checkbox' value="false" name="checkbox">
+                    <input type='text' class='form-control' value='<%=task.taskText%>' readonly>
+                    <button type="submit" class='input-group-text'>Abandon</button>
+                    <input type="text" class="d-none" name="taskId" value="<%=task._id%>" placeholder="Enter a new task here">
+                    <input type="text" class="d-none" name="user" value="<%= user%>" placeholder="Enter a new task here">
+                </div>
+            </form>
+        <% } else if ((task.taskState === "finished")){ %>
+            <form action="/finished" method="post">
+                <div class='input-group-text px-0 py-0 mx-auto w-50 mb-2' id="list-item-<%=task._id%>" name="listItem" >
+                    <input onChange="this.form.submit()" class='form-check mx-2' type='checkbox' value="false" name="checkbox" checked>
+                    <input type='text' class='form-control text-decoration-line-through' value='<%=task.taskText%>' readonly>
+                    <input type="text" class="d-none" name="taskId" value="<%=task._id%>" placeholder="Enter a new task here">
+                    <input type="text" class="d-none" name="user" value="<%= user%>" placeholder="Enter a new task here">
+                </div>
+            </form>
+        <% } else { %>
+        <% } %>
+
+    <% } %>

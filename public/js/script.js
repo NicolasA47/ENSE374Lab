@@ -8,12 +8,12 @@
         addBtn.click(generateListElement);
         removeBtn.click(removeComplete);
      
-        function generateListElement(){
-            list.after(`<div class='input-group mx-auto mb-2 w-50 py-2 mb-2' id='list-item-${counter}'><input type='text' class='form-control' value='${inputField.val() }' id="list-input-${counter}" readonly><button class='input-group-text' id='list-btn-${counter}'>Claim</button></div>`);
-            $(`#list-btn-${counter}`).click(claimTask);
-            inputField.val("");
-            counter++;
-        }
+        // function generateListElement(){
+        //     list.after(`<div class='input-group mx-auto mb-2 w-50 py-2 mb-2' id='list-item-${counter}'><input type='text' class='form-control' value='${inputField.val() }' id="list-input-${counter}" readonly><button class='input-group-text' id='list-btn-${counter}'>Claim</button></div>`);
+        //     $(`#list-btn-${counter}`).click(claimTask);
+        //     inputField.val("");
+        //     counter++;
+        // }
     
         function claimTask(event){
             let id = event.currentTarget.id.at(-1);
@@ -24,8 +24,7 @@
             input.parent().addClass("input-group-text px-0 py-0");
             input.before(`<input class='form-check mx-2' type='checkbox' id='list-checkbox-${id}'>`)    
             btn.click(abandonTask);
-            $(`#list-checkbox-${id}`).click(completeTask);
-            
+            $(`#list-checkbox-${id}`).click(completeTask);   
 
         }
         function abandonTask(event){
