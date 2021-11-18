@@ -1,253 +1,335 @@
-const express = require ( "express" );
+const express  = require( "express" );
+const mongoose = require( "mongoose" );
+const taskListDB = require("./models/taskListModel");
+const session = require("express-session")
+const passport = require("passport")
+const passportLocalMongoose = require("passport-local-mongoose")
+require("dotenv").config();
 
-// this is a canonical alias to make your life easier, like jQuery to $.
-const app = express();
-const fs = require('fs');
+const app = express(); 
+const port = 3000;
 
-app.set("view engine", "ejs");
+app.use( express.urlencoded( { extended: true} ) ); 
 
+app.use(session({
+    secret: process.env.SECRET,
+    resave: false,
+    saveUninitialized: false
+}));
 
-
-// a common localhost test port
-const port = 3000; 
-
-// Simple server operation
-app.use(express.urlencoded({ extended: true}));
-app.use(express.static("public"));
-const todoListRaw = fs.readFileSync("taskList.json");
-
-function loadList(){
-let todoList = JSON.parse(todoListRaw);
-
-return todoList;
-}
+app.use (passport.initialize());
+app.use (passport.session());
 
 
-app.get("/", (req, res) => {
-    res.sendFile(__dirname + "/index.html");
-    // fs.writeFile(__dirname + "/userList.json", JSON.stringify(userData), function(err){
-    //     if(err){
-    //         console.log("error");
-    //     }
-    //     else console.log("pushed User List");
-    // });
-    // fs.writeFile(__dirname + "/taskList.json", JSON.stringify(tasks), function(err){
-    //     if(err){
-    //         console.log("error");
-    //     }
-    //     else console.log("pushed Tasks List");
-    // });
-});
 
-app.post("/todo", (req, res) => {
-    let todoList = loadList();
-    fs.readFile(__dirname + "/userList.json", 'utf-8', (err, data) =>{
-        valid = false;
-        if (err) {
-            console.log(`Error reading file from disk: ${err}`);
-        } 
-        else {
-            const userData = JSON.parse(data);
-            for(let entry of userData){
-                if((entry.username === req.body.Email)&&(entry.password === req.body.Password)){
-                    console.log("match");
-                    res.render("todo", 
-                    {
-                        user: entry,
-                        taskList: todoList
-                    });
+app.set( "view engine", "ejs" );
 
-                    valid = true;
-                    break;
-                }
-                else {
-                    console.log("nope");
-                }    
-            };      
-            if (valid === false){
-                res.redirect("/");
-            }
-        }   
-    })
-});
+mongoose.connect( 'mongodb://localhost:27017/todo', 
+                 { useNewUrlParser: true, useUnifiedTopology: true });
 
-app.post("/signup", (req, res) => {
-    if(req.body.Authentication == "todo2021")
-    {
-        addUser(req.body.EmailSu, req.body.PasswordSu);
-        console.log("success");
-        res.redirect("/");
-    }
-    else{
-        console.log("failure");
-    }
-});
+const userSchema = new mongoose.Schema ({
+    username: String,
+    password: String
+})
 
-app.listen (port, () => {
+
+
+userSchema.plugin(passportLocalMongoose);
+
+const User = new mongoose.model("User", userSchema);
+
+passport.use(User.createStrategy());
+
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
+app.listen ( port, () => {
     console.log (`Server is running on http://localhost:${port}`);
 });
 
-app.post("/claim", (req, res) => {
-    let todoList = loadList();
-    let currentUser = req.body.user;
-    claimTask(req.body.taskId, currentUser, todoList);
-    res.render("todo", {
-        user: currentUser,
-        taskList: todoList
+app.get("/", (req, res) => {
+    res.sendFile(__dirname + "/index.html");
+});
+
+app.post( "/register", (req, res) => {
+    console.log( "User " + req.body.username + " is attempting to register" );
+    User.register({ username : req.body.username }, 
+                    req.body.password, 
+                    ( err, user ) => {
+        if ( err ) {
+        console.log( err );
+            res.redirect( "/" );
+        } else {
+            passport.authenticate( "local" )( req, res, () => {
+                res.redirect( "/" );
+            });
+        }
+    });
+});
+////////////////////////////////////////////////////////////////////
+app.post( "/login", ( req, res ) => {
+    console.log( "User " + req.body.username + " is attempting to log in" );
+    const user = new User ({
+        username: req.body.username,
+        password: req.body.password
+    });
+    req.login ( user, ( err ) => {
+        if ( err ) {
+            console.log( err );
+            res.redirect( "/" );
+        } else {
+            passport.authenticate( "local" )( req, res, () => {
+                console.log( "was authorized and found:" );
+                
+                taskListDB.find()
+                .then((results)=>{
+                   res.redirect('/todo');
+                }); 
+            });
+        }
     });
 });
 
-app.post("/abandon", (req, res) => {
-    let todoList = loadList();
+
+app.post("/addTask", (req, res) => {
+    taskListDB.find()
+    .then((todoList) =>{     
+        const newTask = new taskListDB(
+            {
+                "_id": todoList.length,
+                "taskText": req.body.inputText,
+                "taskState": "unclaimed",
+                "taskCreator": req.body.user,
+                "isTaskClaimed": false,
+                "claimingUser": "",
+                "isTaskDone": false,
+                "isTaskCleared": false
+            });
+        newTask.save();
+        res.redirect('/todo');
+        
+    })
+    .catch((err)=>{                         //if error is caught then console log the error
+        console.log(err);
+    });
+});
+
+
+app.get("/todo", (req, res) => {
+        console.log(req.body.passUser);
+        taskListDB.find()
+        .then((todoList) =>{   
+            res.render("todo", {
+                user: req.body.user,
+                taskList: todoList
+            });
+        })
+        .catch((err)=>{                         //if error is caught then console log the error
+            console.log(err);
+        });
+
+});
+
+
+
+app.post("/claim", (req, res) => {
+    async function claimTask(id, currentUser){
+        try{
+            await taskListDB.findOneAndUpdate({_id: id}, {taskState: "claimed", isTaskClaimed: true, claimingUser: currentUser});
+        }
+        catch(err){
+            console.log(err)
+        }
+    }
     let currentUser = req.body.user;
-    if(req.body.checkbox){
-        completeTask(req.body.taskId, todoList);
+    claimTask(req.body.taskId, currentUser);
+    res.redirect('/todo');
+});
+
+app.post("/abandon", (req, res) => {
+    async function abandonTask(id){
+        try{
+            await taskListDB.findOneAndUpdate({_id: id}, {taskState: "unclaimed", isTaskClaimed: false, claimingUser: ""});
+        }
+        catch(err){
+            console.log(err)
+        }
     }
-    else{
-        abandonTask(req.body.taskId, todoList);
+    
+    async function completeTask(id, todoList){
+        try{
+            if(!todoList[id].isTaskDone){
+                await taskListDB.findOneAndUpdate({_id: id}, {taskState: "finished", isTaskDone : true});
+            }
+            else{
+                await taskListDB.findOneAndUpdate({_id: id}, {taskState: "claimed", isTaskDone : false});
+            }
+        }
+        catch(err){
+            console.log(err)
+        }
     }
-    res.render("todo", {
-        user: currentUser,
-        taskList: todoList
+    taskListDB.find()
+    .then((todoList) =>{     
+        let currentUser = req.body.user;
+        if(req.body.checkbox){
+            completeTask(req.body.taskId, todoList);
+        }
+        else{
+            abandonTask(req.body.taskId);
+        }
+        res.redirect('/todo');
+    })
+    .catch((err)=>{                         //if error is caught then console log the error
+        console.log(err);
     });
 });
 
 app.post("/finished", (req, res) => {
-    let todoList = loadList();
-    let currentUser = req.body.user;
-    completeTask(req.body.taskId, todoList);
-    res.render("todo", {
-        user: currentUser,
-        taskList: todoList
+    async function completeTask(id, todoList){
+        try{
+            if(!todoList[id].isTaskDone){
+                await taskListDB.findOneAndUpdate({_id: id}, {taskState: "finished", isTaskDone : true});
+            }
+            else{
+                await taskListDB.findOneAndUpdate({_id: id}, {taskState: "claimed", isTaskDone : false});
+            }
+        }
+        catch(err){
+            console.log(err)
+        }
+    }
+    let todoList;
+    taskListDB.find()
+    .then((todoList) =>{     
+        let currentUser = req.body.user;
+        completeTask(req.body.taskId, todoList);
+        res.redirect('/todo');
+    })
+    .catch((err)=>{                         //if error is caught then console log the error
+        console.log(err);
     });
 });
+
+
+////////////////////////////////////////////////////////////////////
+
+
 
 app.post("/remove", (req, res) => {
-    let todoList = loadList();
-    let currentUser = req.body.user;
-    removeComplete(todoList);
-    res.render("todo", {
-        user: currentUser,
-        taskList: todoList
+    
+    async function removeComplete(){
+        try{
+            await taskListDB.deleteMany({isTaskDone: true});
+        }
+        catch(err){
+            consol.log(err);
+        }
+    }
+
+    let todoList;
+    taskListDB.find()
+    .then((todoList) =>{     
+        let currentUser = req.body.user;
+        removeComplete(todoList);
+        res.redirect('/todo');
+    })
+    .catch((err)=>{                         //if error is caught then console log the error
+        console.log(err);
     });
 });
 
-app.post("/addTask", (req, res) => {
-    let todoList = loadList();
-    addTask(req.body.inputText, req.body.user, todoList);
-    res.render("todo", {
-        user: req.body.user,
-        taskList: todoList
-    });
+app.post( "/logout", ( req, res ) => {
+    console.log( "A user is logging out" );
+    req.logout();
+    res.redirect("/");
 });
 
 
-function addUser(username, password){
-    //get user list
-    fs.readFile(__dirname + "/userList.json", 'utf-8', (err, data) =>{
-        if (err) {
-            console.log(`Error reading file from disk: ${err}`);
-        } 
-        else {
-            const userData = JSON.parse(data);
-    //parse into obj
-    //push new user
-    userData.push({username, password});
-    //stringify and send back to json file
-    fs.writeFile(__dirname + "/userList.json", JSON.stringify(userData), function(err){
-            if(err){
-                console.log("error");
-            }
-            else console.log("pushed new user to List");
-        });
-        }
-    });
-}
 
-function addTask(taskText, taskCreator, todoList){
-    let newId = todoList.length;
-    todoList.push(
-        {
-            "_id": newId,
-            "taskText": taskText,
-            "taskState": "unclaimed",
-            "taskCreator": taskCreator,
-            "isTaskClaimed": false,
-            "claimingUser":  { username: "", password: "" },
-            "isTaskDone": false,
-            "isTaskCleared": false
-        });
-    fs.writeFile(__dirname + "/taskList.json", JSON.stringify(todoList), function(err){
-        if(err){
-            console.log("error");
-        }
-        else {
-            console.log("pushed new task");
-        }
-    });
-}
+    
 
-function claimTask(id, currentUser, todoList){
-    todoList[id].taskState = "claimed";
-    todoList[id].isTaskClaimed = true;
-    todoList[id].claimingUser = currentUser;
-    fs.writeFile(__dirname + "/taskList.json", JSON.stringify(todoList), function(err){
-        if(err){
-            console.log("error");
-        }
-        else {
-            console.log(`${currentUser} claimed new task`);
-        }
-    });
-}
+    // const user1 = new userDB({
+    //     username:   "Chad",
+    //     password:   "abc123"
+    // });
+    // user1.save();
+    // const user2 = new userDB({
+    //     username:   "Bob",
+    //     password:   "321bcd"
+    // });
+    // user2.save();
+    // const taskItem1 = new taskListDB({
+    //     _id: 1,
+    //     taskText:   "Do Nothing",
+    //     taskState:  "unclaimed",
+    //     taskCreator: "Chad",
+    //     isTaskClaimed: false,
+    //     claimingUser:  "",
+    //     isTaskDone: false,
+    //     isTaskCleared: false
+    // });
+    // const taskItem2 = new taskListDB({
+    //     _id: 2,
+    //     taskText:   "drop out of this lab",
+    //     taskState:  "claimed",
+    //     taskCreator: "Chad",
+    //     isTaskClaimed: true,
+    //     claimingUser:  "Bob",
+    //     isTaskDone: false,
+    //     isTaskCleared: false
+    // });
+    // const taskItem3 = new taskListDB({
+    //     _id: 3,
+    //     taskText:   "play league",
+    //     taskState:  "claimed",
+    //     taskCreator: "Chad",
+    //     isTaskClaimed: true,
+    //     claimingUser:  "Chad",
+    //     isTaskDone: false,
+    //     isTaskCleared: false
+    // });
+    // const taskItem4 = new taskListDB({
+    //     _id: 4,
+    //     taskText:   "eat shorts",
+    //     taskState:  "claimed",
+    //     taskCreator: "Chad",
+    //     isTaskClaimed: true,
+    //     claimingUser:  "Chad",
+    //     isTaskDone: false,
+    //     isTaskCleared: false
+    // });
+    // const taskItem5 = new taskListDB({
+    //     _id: 5,
+    //     taskText:   "stop drop and roll",
+    //     taskState:  "finished",
+    //     taskCreator: "Chad",
+    //     isTaskClaimed: true,
+    //     claimingUser:  "Chad",
+    //     isTaskDone: true,
+    //     isTaskCleared: false
+    // });
+    // const taskItem6 = new taskListDB({
+    //     _id: 6,
+    //     taskText:   "slowly descend into madness while doing adams lab",
+    //     taskState:  "finished",
+    //     taskCreator: "Bob",
+    //     isTaskClaimed: true,
+    //     claimingUser:  "Bob",
+    //     isTaskDone: true,
+    //     isTaskCleared: true
+    // });
 
-function abandonTask(id, todoList){
-    todoList[id].taskState = "unclaimed";
-    todoList[id].isTaskClaimed = false;
-    todoList[id].claimingUser = { username: "", password: "" };
-    fs.writeFile(__dirname + "/taskList.json", JSON.stringify(todoList), function(err){
-        if(err){
-            console.log("error");
-        }
-        else {
-            console.log(`abandoned a task`);
-        }
-    });
-}
-function completeTask(id, todoList){
-  
-    if(!todoList[id].isTaskDone){
-        todoList[id].taskState = "finished";
-        todoList[id].isTaskDone = true;
-    }
-    else{
-        todoList[id].taskState = "claimed";
-        todoList[id].isTaskDone = false;
-    }
-    fs.writeFile(__dirname + "/taskList.json", JSON.stringify(todoList), function(err){
-        if(err){
-            console.log("error");
-        }
-        else {
-            console.log(`finished a task`);
-        }
-    });
-}
-function removeComplete(todoList){
-    todoList.forEach(function callback(value, index){
-        if(value.isTaskDone){
-            todoList.splice(index, 1); 
-        }
-    });
-    fs.writeFile(__dirname + "/taskList.json", JSON.stringify(todoList), function(err){
-        if(err){
-            console.log("error");
-        }
-        else {
-            console.log(`finished a task`);
-        }
-    });
-}
+    // taskItem1.save();
+    // taskItem2.save();
+    // taskItem3.save();
+    // taskItem4.save();
+    // taskItem5.save();
+    // taskItem6.save();
 
+
+
+
+ 
 
 
